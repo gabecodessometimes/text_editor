@@ -1,9 +1,19 @@
 // a very basic text editor written in C
 // Author: Gabriel Sullivan
 
+
+// to be added: proper memory allocation for the lines
+// freeing memory after lines are deleted and allocating memory as lines are created
+// freeing memory when items are deleted or backspaced
+// maybe add functions to further encapsculate the code for instance a function to delete a line or a function to add a line
+
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <windows.h>
+
+const int MAX_FILE_SIZE = 256; // Maximum number of lines in the file
+const int MAX_LINE_SIZE = 256; // Maximum number of characters in a line
 
 char lines[256][256] = {0}; // Stores the file lines to be worked with
 int line_count = 0;   // To track the number of lines
@@ -29,6 +39,9 @@ void render_line(int line_number);
 // the main editor loop
 void input_loop();
 
+// to free up memory
+void clear_memory();
+
 int main(int argc, char *argv[])
 {
     set_color(10);
@@ -39,7 +52,6 @@ int main(int argc, char *argv[])
     }
 
     filename = argv[1];
-
     load_file();
 
     // Display editor for the first time
@@ -52,6 +64,7 @@ int main(int argc, char *argv[])
     move_cursor(cursor_x, cursor_y);
 
     input_loop();
+    clear_memory();
 
     return 0;
 }
@@ -82,7 +95,7 @@ void load_file()
     printf("File opened successfully.\n");
 
     // Read in the file
-    while (fgets(lines[line_count], 256, fptr) && line_count < 256)
+    while (fgets(lines[line_count], MAX_FILE_SIZE, fptr) && line_count < MAX_FILE_SIZE)
     {
         lines[line_count][strcspn(lines[line_count], "\n")] = '\0';
         line_count++;
@@ -132,10 +145,10 @@ void input_loop()
     int absolute_y = 0;
     int absolute_x = 0;
 
-    int longest_length = 257;
-
     // this is the correct starting x whenever moving down a row
     int official_absolute_x = 0;
+
+    int longest_length = MAX_LINE_SIZE; // the length of the line for restricting cursor movement in the x direction
 
     HANDLE hInput = GetStdHandle(STD_INPUT_HANDLE);
     INPUT_RECORD inputRecord;
@@ -147,7 +160,7 @@ void input_loop()
         if (inputRecord.EventType == KEY_EVENT && inputRecord.Event.KeyEvent.bKeyDown)
         {
             int key = inputRecord.Event.KeyEvent.wVirtualKeyCode;
-
+            int len = strlen(lines[absolute_y]);
             // Handle arrow keys
             if (key == VK_UP)
             {
@@ -194,8 +207,6 @@ void input_loop()
             {
                 if (absolute_x > 0)
                 {
-                    int len = strlen(lines[absolute_y]);
-
                     for (int i = absolute_x - 1; i < len; i++)
                     {
                         lines[absolute_y][i] = lines[absolute_y][i + 1];
@@ -225,9 +236,7 @@ void input_loop()
             }
             else if (key == VK_RETURN)
             {
-                int len = strlen(lines[absolute_y]);
-
-                if (line_count < 256)
+                if (line_count < MAX_FILE_SIZE)
                 {
                     // Shift the lines down
                     for (int i = line_count; i > absolute_y; i--)
@@ -251,11 +260,32 @@ void input_loop()
             }
             else if (key == VK_DELETE)
             {
+                if (absolute_x < len)
+                {
+                    for (int i = absolute_x; i < len; i++)
+                    {
+                        lines[absolute_y][i] = lines[absolute_y][i + 1]; // cycles through the line and moves it left
+                    }
+
+                    render_line(absolute_y);
+                }
+                else if (absolute_y < line_count - 1) // otherwise it moves the previous line upwards to the current line
+                {
+                    strcat(lines[absolute_y], lines[absolute_y + 1]);
+
+                    // Shift the lines up
+                    for (int i = absolute_y + 1; i < line_count - 1; i++)
+                    {
+                        strcpy(lines[i], lines[i + 1]);
+                    }
+
+                    line_count--;
+                    render_editor();
+                }
             }
-            else if (key >= 0x20 && key <= 0x7E)
+            else if (key >= 0x20 && key <= 0x7E) // otherwise for alphabet characters
             {
                 char ch = inputRecord.Event.KeyEvent.uChar.AsciiChar;
-                int len = strlen(lines[absolute_y]);
 
                 for (int i = len; i >= absolute_x; i--)
                 {
@@ -267,20 +297,27 @@ void input_loop()
                 official_absolute_x++;
                 render_line(absolute_y);
             }
-
-            longest_length = strlen(lines[absolute_y]);
-            absolute_x = (absolute_x > longest_length) ? longest_length : absolute_x;
-
-            cursor_x = absolute_x + 4;
-            cursor_y = absolute_y + 2 - (bottom - 10);
-            move_cursor(cursor_x, cursor_y);
-
-            // Exit on ESC key
-            if (key == VK_ESCAPE)
+            else if (key == VK_ESCAPE) // exit the program on the escape key
             {
                 system("cls"); // Clear the terminal
                 break;
             }
+
+            longest_length = strlen(lines[absolute_y]);
+            absolute_x = (absolute_x > longest_length) ? longest_length : absolute_x;
+
+            // set the cursor placement based on the offset of the menu
+            cursor_x = absolute_x + 4;
+            cursor_y = absolute_y + 2 - (bottom - 10);
+            move_cursor(cursor_x, cursor_y);
         }
     }
+}
+
+void clear_memory() {
+    for(int i = 0; i < line_count; i++) {
+        free(lines[i]);
+    }
+
+    free(lines);
 }
