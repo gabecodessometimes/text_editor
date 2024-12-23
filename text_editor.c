@@ -8,6 +8,50 @@ int cursor_x = 0;
 int cursor_y = 0;
 char *filename;
 
+// sets the terminal color
+void set_color(int color);
+
+// places the cursor
+void move_cursor(int x, int y);
+
+// loads in the file
+void load_file();
+
+// renders the editor
+void render_editor();
+
+void render_line(int line_number);
+
+// the main editor loop
+void input_loop();
+
+int main(int argc, char *argv[])
+{
+    set_color(10);
+    if (argc < 2)
+    {
+        printf("Please specify a file name.\n");
+        return 1;
+    }
+
+    filename = argv[1];
+
+    load_file();
+
+    // Display editor for the first time
+    system("cls");
+    render_editor();
+
+    // reset the curspr
+    cursor_x = 4;
+    cursor_y = 2;
+    move_cursor(cursor_x, cursor_y);
+
+    input_loop();
+
+    return 0;
+}
+
 void set_color(int color)
 {
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -21,42 +65,14 @@ void move_cursor(int x, int y)
     SetConsoleCursorPosition(hConsole, position);
 }
 
-void render_editor()
+void load_file()
 {
-    system("cls"); // Clear the terminal
-
-    printf("%s\n\n", filename);
-
-    // Print the file
-    for (int i = 0; i < line_count; i++)
-    {
-        if(i < 10) {
-            printf("%d   %s\n", i, lines[i]);
-        } else if(i < 100) {
-            printf("%d  %s\n", i, lines[i]);
-        } else {
-            printf("%d %s\n", i, lines[i]);
-        }
-    }
-}
-
-int main(int argc, char *argv[])
-{
-    set_color(10);
-    if (argc < 2)
-    {
-        printf("Please specify a file name.\n");
-        return 1;
-    }
-
-    filename = argv[1];
-
     // Open the file
     FILE *fptr = fopen(filename, "r");
     if (fptr == NULL)
     {
         printf("Unable to open the file or the file does not exist.\n");
-        return 1;
+        exit;
     }
 
     printf("File opened successfully.\n");
@@ -69,19 +85,50 @@ int main(int argc, char *argv[])
     }
 
     fclose(fptr); // Close the file after reading
+}
 
-    render_editor(); // Display editor
+void render_editor()
+{
+    move_cursor(0, 0);
+
+    printf("%s\n\n", filename);
+
+    // Print the file
+    for (int i = 0; i < line_count; i++)
+    {
+        if (i < 10)
+        {
+            printf("%d   %s\n", i, lines[i]);
+        }
+        else if (i < 100)
+        {
+            printf("%d  %s\n", i, lines[i]);
+        }
+        else
+        {
+            printf("%d %s\n", i, lines[i]);
+        }
+    }
+}
+
+void render_line(int line_number)
+{
+    move_cursor(0, line_number + 2); // Adjust for header offset
+    if (line_number < 10)
+        printf("%d   %s\033[K", line_number, lines[line_number]); // Clear to end of line
+    else if (line_number < 100)
+        printf("%d  %s\033[K", line_number, lines[line_number]);
+    else
+        printf("%d %s\033[K", line_number, lines[line_number]);
+}
+
+void input_loop()
+{
+    // these are the location of the cursor relative to the document
+    int absolute_y = 0;
+    int absolute_x = 0;
 
     int longest_length = 257;
-
-    // reset the curspr
-    cursor_x = 4;
-    cursor_y = 2;
-    move_cursor(cursor_x, cursor_y);
-
-    // these are the location of the cursor relative to the document
-    char absolute_y = 0;
-    char absolute_x = 0;
 
     // this is the correct starting x whenever moving down a row
     int official_absolute_x = 0;
@@ -127,6 +174,65 @@ int main(int argc, char *argv[])
                 absolute_x++;
                 official_absolute_x = absolute_x;
             }
+            else if (key == VK_BACK)
+            {
+                if (absolute_x > 0)
+                {
+                    int len = strlen(lines[absolute_y]);
+
+                    for (int i = absolute_x - 1; i < len; i++)
+                    {
+                        lines[absolute_y][i] = lines[absolute_y][i + 1];
+                    }
+
+                    absolute_x--;
+                    official_absolute_x = absolute_x;
+                    render_line(absolute_y);
+                }
+                else if (absolute_y > 0)
+                {
+                    int prev_len = strlen(lines[absolute_y - 1]);
+                    strcat(lines[absolute_y - 1], lines[absolute_y]);
+
+                    // Shift the lines up
+                    for (int i = absolute_y; i < line_count - 1; i++)
+                    {
+                        strcpy(lines[i], lines[i + 1]);
+                    }
+
+                    line_count--;
+                    absolute_y--;
+                    absolute_x = prev_len - 1;
+                    official_absolute_x = absolute_x;
+                    render_editor();
+                }
+            }
+            else if (key == VK_RETURN)
+            {
+                int len = strlen(lines[absolute_y]);
+
+                if (line_count < 256)
+                {
+                    // Shift the lines down
+                    for (int i = line_count; i > absolute_y; i--)
+                    {
+                        strcpy(lines[i], lines[i - 1]);
+                    }
+
+                    strcpy(lines[absolute_y + 1], &lines[absolute_y][absolute_x]);
+                    lines[absolute_y][absolute_x] = '\0';
+
+                    line_count++;
+                    absolute_y++;
+                    absolute_x = 0;
+                    official_absolute_x = 0;
+                    system("cls");
+                    render_editor();
+                }
+            }
+            else if (key == VK_DELETE)
+            {
+            }
             else if (key >= 0x20 && key <= 0x7E)
             {
                 char ch = inputRecord.Event.KeyEvent.uChar.AsciiChar;
@@ -140,7 +246,7 @@ int main(int argc, char *argv[])
                 lines[absolute_y][absolute_x] = ch;
                 absolute_x++;
                 official_absolute_x++;
-                render_editor();
+                render_line(absolute_y);
             }
 
             longest_length = strlen(lines[absolute_y]);
@@ -158,6 +264,4 @@ int main(int argc, char *argv[])
             }
         }
     }
-
-    return 0;
 }
