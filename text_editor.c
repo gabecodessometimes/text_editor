@@ -1,11 +1,15 @@
+// a very basic text editor written in C
+// Author: Gabriel Sullivan
+
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
 
-char lines[256][256]; // Stores the file lines to be worked with
+char lines[256][256] = {0}; // Stores the file lines to be worked with
 int line_count = 0;   // To track the number of lines
 int cursor_x = 0;
 int cursor_y = 0;
+int bottom = 10;
 char *filename;
 
 // sets the terminal color
@@ -72,7 +76,7 @@ void load_file()
     if (fptr == NULL)
     {
         printf("Unable to open the file or the file does not exist.\n");
-        exit;
+        exit(1);
     }
 
     printf("File opened successfully.\n");
@@ -94,7 +98,7 @@ void render_editor()
     printf("%s\n\n", filename);
 
     // Print the file
-    for (int i = 0; i < line_count; i++)
+    for (int i = bottom - 10; i < bottom; i++)
     {
         if (i < 10)
         {
@@ -151,6 +155,12 @@ void input_loop()
                 {
                     absolute_y--;
                     absolute_x = official_absolute_x;
+
+                    if(absolute_y < bottom - 10) {
+                        bottom--;
+                        system("cls");
+                        render_editor();
+                    }
                 }
             }
             else if (key == VK_DOWN)
@@ -159,6 +169,12 @@ void input_loop()
                 {
                     absolute_y++;
                     absolute_x = official_absolute_x;
+
+                    if(absolute_y >= bottom) {
+                        bottom++;
+                        system("cls");
+                        render_editor();
+                    }
                 }
             }
             else if (key == VK_LEFT)
@@ -226,6 +242,9 @@ void input_loop()
                     absolute_y++;
                     absolute_x = 0;
                     official_absolute_x = 0;
+                    if(absolute_y >= bottom) {
+                        bottom++;
+                    }
                     system("cls");
                     render_editor();
                 }
@@ -253,7 +272,7 @@ void input_loop()
             absolute_x = (absolute_x > longest_length) ? longest_length : absolute_x;
 
             cursor_x = absolute_x + 4;
-            cursor_y = absolute_y + 2;
+            cursor_y = absolute_y + 2 - (bottom - 10);
             move_cursor(cursor_x, cursor_y);
 
             // Exit on ESC key
