@@ -1,11 +1,6 @@
 // a very basic text editor written in C
 // Author: Gabriel Sullivan
 
-// to be added: proper memory allocation for the lines
-// freeing memory after lines are deleted and allocating memory as lines are created
-// freeing memory when items are deleted or backspaced
-// maybe add functions to further encapsculate the code for instance a function to delete a line or a function to add a line
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
