@@ -1,7 +1,6 @@
 // a very basic text editor written in C
 // Author: Gabriel Sullivan
 
-
 // to be added: proper memory allocation for the lines
 // freeing memory after lines are deleted and allocating memory as lines are created
 // freeing memory when items are deleted or backspaced
@@ -15,8 +14,8 @@
 const int MAX_FILE_SIZE = 256; // Maximum number of lines in the file
 const int MAX_LINE_SIZE = 256; // Maximum number of characters in a line
 
-char lines[256][256] = {0}; // Stores the file lines to be worked with
-int line_count = 0;   // To track the number of lines
+char **lines = NULL; // Stores the file lines to be worked with
+int line_count = 0;  // To track the number of lines
 int cursor_x = 0;
 int cursor_y = 0;
 int bottom = 10;
@@ -34,7 +33,20 @@ void load_file();
 // renders the editor
 void render_editor();
 
+// renders a specific lines
 void render_line(int line_number);
+
+// shifts the lines down
+void shift_lines_down(int start_index);
+
+//shifts the lines up
+void shift_lines_up(int start_index);
+
+// shifts the letters to the right
+void shift_letters_right(int start_line_index, int start_letter_index);
+
+// shifts the letters to the left
+void shift_letters_left(int start_line_index, int start_letter_index);
 
 // the main editor loop
 void input_loop();
@@ -44,6 +56,23 @@ void clear_memory();
 
 int main(int argc, char *argv[])
 {
+    lines = malloc(MAX_FILE_SIZE * sizeof(char *));
+    if (!lines)
+    {
+        perror("Memory allocation failed.");
+        exit(1);
+    }
+
+    for (int i = 0; i < MAX_FILE_SIZE; i++)
+    {
+        lines[i] = malloc(MAX_LINE_SIZE * sizeof(char));
+        if (!lines[i])
+        {
+            perror("Memory allocation failed.");
+            exit(1);
+        }
+    }
+
     set_color(10);
     if (argc < 2)
     {
@@ -113,30 +142,76 @@ void render_editor()
     // Print the file
     for (int i = bottom - 10; i < bottom; i++)
     {
-        if (i < 10)
-        {
-            printf("%d   %s\n", i, lines[i]);
-        }
-        else if (i < 100)
-        {
-            printf("%d  %s\n", i, lines[i]);
-        }
-        else
-        {
-            printf("%d %s\n", i, lines[i]);
-        }
+        if(lines[i] == NULL || i > line_count - 1)
+            break;
+
+        // i is increased by 1 for the label
+        if (i < 11) // line label numbers 1 - 10
+            printf("%d   %s\n", i + 1, lines[i]);
+        else if (i < 101) // line label numbers 11 - 100
+            printf("%d  %s\n", i + 1, lines[i]);
+        else // all other line label numbers
+            printf("%d %s\n", i + 1, lines[i]);
     }
 }
 
-void render_line(int line_number)
+void render_line(int line_index)
 {
-    move_cursor(0, line_number + 2); // Adjust for header offset
-    if (line_number < 10)
-        printf("%d   %s\033[K", line_number, lines[line_number]); // Clear to end of line
-    else if (line_number < 100)
-        printf("%d  %s\033[K", line_number, lines[line_number]);
-    else
-        printf("%d %s\033[K", line_number, lines[line_number]);
+    move_cursor(0, (line_index - (bottom - 10)) + 2); // Adjust for header offset
+    if (line_index <= bottom)
+    { // line_index is increased by 1 for the label
+        if (line_index < 11) // line label numbers 1 - 10
+            printf("%d   %s\033[K", line_index+1, lines[line_index]); // Clear to end of line
+        else if (line_index < 101) // line label numbers 11 - 100
+            printf("%d  %s\033[K", line_index+1, lines[line_index]);
+        else // all other line label numbers
+            printf("%d %s\033[K", line_index+1, lines[line_index]);
+    }
+}
+
+void shift_lines_down(int start_index)
+{
+    if (line_count >= MAX_FILE_SIZE) return;
+    
+    // Shift the lines down
+    for (int i = line_count - 1; i > start_index; i--)
+    {
+        strcpy(lines[i], lines[i - 1]);
+    }
+
+    line_count++;
+}
+
+void shift_lines_up(int start_index) {
+    for (int i = start_index; i < line_count - 1; i++)
+    {
+        strcpy(lines[i], lines[i + 1]);
+    }
+
+    line_count--;
+}
+
+void shift_letters_right(int start_line_index, int start_letter_index) {
+    int len = strlen(lines[start_line_index]);
+    
+    if (len+1 >= MAX_LINE_SIZE) return;
+
+    for (int i = len; i >= start_letter_index; i--)
+    {
+        lines[start_line_index][i + 1] = lines[start_line_index][i];
+    }
+}
+
+void shift_letters_left(int start_line_index, int start_letter_index) {
+    if (start_letter_index <= 0 && start_line_index <= 0) return;
+    if (start_letter_index <= 0) return;
+    
+    int len = strlen(lines[start_line_index]);
+    
+    for (int i = start_letter_index - 1; i < len; i++)
+    {
+        lines[start_line_index][i] = lines[start_line_index][i + 1];
+    }
 }
 
 void input_loop()
@@ -149,6 +224,7 @@ void input_loop()
     int official_absolute_x = 0;
 
     int longest_length = MAX_LINE_SIZE; // the length of the line for restricting cursor movement in the x direction
+    int size = MAX_FILE_SIZE;           // the size of the lines array
 
     HANDLE hInput = GetStdHandle(STD_INPUT_HANDLE);
     INPUT_RECORD inputRecord;
@@ -169,7 +245,8 @@ void input_loop()
                     absolute_y--;
                     absolute_x = official_absolute_x;
 
-                    if(absolute_y < bottom - 10) {
+                    if (absolute_y < bottom - 10)
+                    {
                         bottom--;
                         system("cls");
                         render_editor();
@@ -183,7 +260,8 @@ void input_loop()
                     absolute_y++;
                     absolute_x = official_absolute_x;
 
-                    if(absolute_y >= bottom) {
+                    if (absolute_y >= bottom)
+                    {
                         bottom++;
                         system("cls");
                         render_editor();
@@ -207,11 +285,7 @@ void input_loop()
             {
                 if (absolute_x > 0)
                 {
-                    for (int i = absolute_x - 1; i < len; i++)
-                    {
-                        lines[absolute_y][i] = lines[absolute_y][i + 1];
-                    }
-
+                    shift_letters_left(absolute_y, absolute_x);
                     absolute_x--;
                     official_absolute_x = absolute_x;
                     render_line(absolute_y);
@@ -221,39 +295,14 @@ void input_loop()
                     int prev_len = strlen(lines[absolute_y - 1]);
                     strcat(lines[absolute_y - 1], lines[absolute_y]);
 
-                    // Shift the lines up
-                    for (int i = absolute_y; i < line_count - 1; i++)
-                    {
-                        strcpy(lines[i], lines[i + 1]);
-                    }
+                    shift_lines_up(absolute_y);
 
-                    line_count--;
                     absolute_y--;
                     absolute_x = prev_len - 1;
+
+                    if (absolute_x <= 0) absolute_x = 0;
+
                     official_absolute_x = absolute_x;
-                    render_editor();
-                }
-            }
-            else if (key == VK_RETURN)
-            {
-                if (line_count < MAX_FILE_SIZE)
-                {
-                    // Shift the lines down
-                    for (int i = line_count; i > absolute_y; i--)
-                    {
-                        strcpy(lines[i], lines[i - 1]);
-                    }
-
-                    strcpy(lines[absolute_y + 1], &lines[absolute_y][absolute_x]);
-                    lines[absolute_y][absolute_x] = '\0';
-
-                    line_count++;
-                    absolute_y++;
-                    absolute_x = 0;
-                    official_absolute_x = 0;
-                    if(absolute_y >= bottom) {
-                        bottom++;
-                    }
                     system("cls");
                     render_editor();
                 }
@@ -273,13 +322,30 @@ void input_loop()
                 {
                     strcat(lines[absolute_y], lines[absolute_y + 1]);
 
-                    // Shift the lines up
-                    for (int i = absolute_y + 1; i < line_count - 1; i++)
-                    {
-                        strcpy(lines[i], lines[i + 1]);
-                    }
+                    shift_lines_up(absolute_y);
 
-                    line_count--;
+                    system("cls");
+                    render_editor();
+                }
+            }
+            else if (key == VK_RETURN)
+            {
+                if (line_count < MAX_FILE_SIZE)
+                {
+                    shift_lines_down(absolute_y);
+
+                    // split the line if needed, otherwise just move the line down
+                    strcpy(lines[absolute_y + 1], &lines[absolute_y][absolute_x]);
+                    lines[absolute_y][absolute_x] = '\0';
+
+                    absolute_y++;
+                    absolute_x = 0;
+                    official_absolute_x = 0;
+                    if (absolute_y >= bottom)
+                    {
+                        bottom++;
+                    }
+                    system("cls");
                     render_editor();
                 }
             }
@@ -287,10 +353,7 @@ void input_loop()
             {
                 char ch = inputRecord.Event.KeyEvent.uChar.AsciiChar;
 
-                for (int i = len; i >= absolute_x; i--)
-                {
-                    lines[absolute_y][i + 1] = lines[absolute_y][i];
-                }
+                shift_letters_right(absolute_y, absolute_x);
 
                 lines[absolute_y][absolute_x] = ch;
                 absolute_x++;
@@ -314,8 +377,10 @@ void input_loop()
     }
 }
 
-void clear_memory() {
-    for(int i = 0; i < line_count; i++) {
+void clear_memory()
+{
+    for (int i = 0; i < line_count; i++)
+    {
         free(lines[i]);
     }
 
