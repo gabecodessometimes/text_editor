@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"renderer.h": "c",
+			"windows.h": "c",
+			"stdlib.h": "c",
+			"file_handler.h": "c",
+			"stdio.h": "c",
+			"string.h": "c"
+		}
+	}
+}
