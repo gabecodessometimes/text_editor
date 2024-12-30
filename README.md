@@ -1,1 +1,5 @@
-This is just a super basic EMACS-like text-editor. It still needs some works but basic functionality such as text-editing is available.
+Crispy is a super basic terminal-based code editor designed to have typical keybinds as your everyday document editor.
+
+It currently only supports Windows.
+
+Help is welcomed.
